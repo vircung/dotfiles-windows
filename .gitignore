@@ -1,0 +1,4 @@
+# Ustawienia lokalne (specyficzne dla komputera) - nie trafiaja do repo
+*.local.*
+# ...poza szablonami, z ktorych install.ps1 tworzy brakujace pliki lokalne
+!*.example
