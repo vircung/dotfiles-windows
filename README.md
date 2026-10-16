@@ -35,6 +35,15 @@ mise runs `.ps1` tasks with `pwsh -NoProfile -File` (PowerShell 7, installed by 
 tasks declare `#Requires -Version 7.4`. `install.ps1` itself must stay compatible with
 Windows PowerShell 5.1, since it runs before `pwsh` is installed.
 
+### winget tasks
+
+| Task             | Description |
+|------------------|-------------|
+| `winget:install` | Installs missing apps from `winget/<list>.json` (default `dev`, e.g. `-- -List dev`). Installed packages are skipped; `-Upgrade` upgrades them too. |
+
+Lists use the `winget export` format. mise itself is not listed: `install.ps1` installs it,
+and `winget upgrade` could downgrade a `mise self-update`d binary.
+
 ### WSL tasks
 
 | Task          | Description |
