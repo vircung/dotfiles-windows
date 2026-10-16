@@ -1,0 +1,6 @@
+[tools]
+antigravity-cli = "latest"
+claude = "latest"
+codex = "latest"
+powershell = "latest"
+python = "latest"
