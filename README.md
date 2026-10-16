@@ -35,6 +35,25 @@ mise runs `.ps1` tasks with `pwsh -NoProfile -File` (PowerShell 7, installed by 
 tasks declare `#Requires -Version 7.4`. `install.ps1` itself must stay compatible with
 Windows PowerShell 5.1, since it runs before `pwsh` is installed.
 
+### Update
+
+| Task            | winget                                               | Installer UI | UAC prompts |
+|-----------------|------------------------------------------------------|--------------|-------------|
+| `update`        | `winget upgrade --all` in the terminal               | yes          | per app     |
+| `update:silent` | `winget upgrade --all --silent` via a scheduled task | no           | none        |
+
+Both update all winget apps, then mise itself (`mise self-update`) and the mise tools (`mise upgrade`).
+mise is pinned in winget (see `install.ps1`), so only `mise self-update` updates it.
+`-SkipWinget` / `-SkipMise` skip a part. Old tool versions are kept (running tools lock their files);
+remove them with `mise prune`.
+
+In `update:silent`, winget runs through the `\dotfiles\winget-upgrade` scheduled task ("run with highest privileges"),
+so installers get admin rights without UAC prompts; the task's log is streamed to the terminal.
+The task is installed on first use, and again whenever `mise/lib/winget-upgrade-runner.ps1` changes,
+via `gsudo` - the only UAC prompt. The runner is copied to `%ProgramData%\dotfiles`, writable only by
+admins, and runs under the protected Windows PowerShell 5.1 from System32: a user-writable
+interpreter or script would let any process on the account run code elevated.
+
 ### winget tasks
 
 | Task             | Description |
