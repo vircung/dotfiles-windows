@@ -16,7 +16,7 @@ $repo = Split-Path ($miseDir.LinkTarget ?? $miseDir.FullName)
 $file = Join-Path $repo "winget\$List.json"
 if (-not (Test-Path $file)) {
     $available = (Get-ChildItem (Join-Path $repo 'winget') -Filter *.json).BaseName -join ', '
-    Write-Host "BLAD: Brak listy $file (dostepne: $available)." -ForegroundColor Red
+    Write-Host "ERROR: List $file not found (available: $available)." -ForegroundColor Red
     exit 1
 }
 

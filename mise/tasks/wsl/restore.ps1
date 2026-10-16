@@ -21,7 +21,7 @@ param(
 
 if (-not $Distro) {
     $configured = @(Split-List $env:WSL_BACKUP_DISTROS)
-    if ($configured.Count -ne 1) { Fail "Podaj dystrybucje: mise run wsl:restore -- -Distro <nazwa> (skonfigurowane: $($configured -join ', '))." }
+    if ($configured.Count -ne 1) { Fail "Specify the distro: mise run wsl:restore -- -Distro <name> (configured: $($configured -join ', '))." }
     $Distro = $configured[0]
 }
 
@@ -29,14 +29,14 @@ if (-not $Distro) {
 if (-not $File) {
     Assert-Config @{ WSL_BACKUP_DIR = $BackupDir }
     $dir = Join-Path $BackupDir $Distro
-    if (-not (Test-Path $dir)) { Fail "Brak katalogu $dir (czy dysk jest podpiety?)." }
-    $idx, $what = $Previous ? (1, 'poprzedniej') : (0, 'zadnej')
+    if (-not (Test-Path $dir)) { Fail "Directory $dir not found (is the drive connected?)." }
+    $idx, $what = $Previous ? (1, 'previous') : (0, 'any')
     $backups = @(Get-ChildItem $dir -Filter '*.tar.gz' | Sort-Object Name -Descending)
-    if ($backups.Count -le $idx) { Fail "Brak $what kopii '$Distro' w $dir." }
+    if ($backups.Count -le $idx) { Fail "No $what backup of '$Distro' in $dir." }
     $File = $backups[$idx].FullName
 }
 $archive = Get-Item $File -ErrorAction SilentlyContinue
-if (-not $archive) { Fail "Nie znaleziono pliku $File." }
+if (-not $archive) { Fail "File $File not found." }
 
 # --- Install location: the distro's current location or WSL_DISTRO_DIR\<distro> ---
 $info = Get-DistroInfo $Distro
@@ -49,26 +49,26 @@ if (-not $InstallDir) {
     }
 }
 
-Write-Host ('Kopia:       {0} ({1:N1} GB, {2})' -f $archive.FullName, ($archive.Length / 1GB), $archive.LastWriteTime)
-Write-Host "Dystrybucja: $Distro $($info ? '(ISTNIEJE - zostanie USUNIETA)' : '(nowa)')"
-Write-Host "Lokalizacja: $InstallDir"
+Write-Host ('Backup:   {0} ({1:N1} GB, {2})' -f $archive.FullName, ($archive.Length / 1GB), $archive.LastWriteTime)
+Write-Host "Distro:   $Distro $($info ? '(EXISTS - will be REMOVED)' : '(new)')"
+Write-Host "Location: $InstallDir"
 
 if (-not $Force) {
-    $answer = Read-Host "`nWpisz nazwe dystrybucji ($Distro), aby kontynuowac"
-    if ($answer -cne $Distro) { Write-Host 'Anulowano.'; exit 1 }
+    $answer = Read-Host "`nType the distro name ($Distro) to continue"
+    if ($answer -cne $Distro) { Write-Host 'Cancelled.'; exit 1 }
 }
 
 # --- Verify the archive BEFORE removing the distro ---
 # The listing (hundreds of thousands of lines) goes straight to a null stream, bypassing the PowerShell pipeline.
-Write-Host "`nSprawdzanie integralnosci archiwum (kilka minut)..."
+Write-Host "`nVerifying archive integrity (takes a few minutes)..."
 $psi = New-Object Diagnostics.ProcessStartInfo "$env:SystemRoot\System32\tar.exe", "-tzf `"$($archive.FullName)`""
 $psi.UseShellExecute = $false
 $psi.RedirectStandardOutput = $true
 $tar = [Diagnostics.Process]::Start($psi)
 $tar.StandardOutput.BaseStream.CopyTo([IO.Stream]::Null)
 $tar.WaitForExit()
-if ($tar.ExitCode -ne 0) { Fail 'Archiwum jest uszkodzone - nic nie zostalo zmienione.' }
-Write-Host 'Archiwum OK.' -ForegroundColor Green
+if ($tar.ExitCode -ne 0) { Fail 'The archive is corrupted - nothing was changed.' }
+Write-Host 'Archive OK.' -ForegroundColor Green
 
 # --- Replace the distro ---
 $dockerWasRunning = $false
@@ -76,24 +76,24 @@ try {
     $dockerWasRunning = Stop-DockerAndWsl
     if ($info) {
         wsl --unregister $Distro
-        if ($LASTEXITCODE -ne 0) { Fail "wsl --unregister zakonczyl sie kodem $LASTEXITCODE." }
+        if ($LASTEXITCODE -ne 0) { Fail "wsl --unregister failed with exit code $LASTEXITCODE." }
     }
     New-Item -ItemType Directory -Force $InstallDir | Out-Null
 
-    Write-Host "Import '$Distro' do $InstallDir..."
+    Write-Host "Importing '$Distro' into $InstallDir..."
     wsl --import $Distro $InstallDir $archive.FullName
-    if ($LASTEXITCODE -ne 0) { Fail "wsl --import zakonczyl sie kodem $LASTEXITCODE. Sprobuj recznie: wsl --import $Distro `"$InstallDir`" `"$($archive.FullName)`"" }
+    if ($LASTEXITCODE -ne 0) { Fail "wsl --import failed with exit code $LASTEXITCODE. Try manually: wsl --import $Distro `"$InstallDir`" `"$($archive.FullName)`"" }
 
     wsl --manage $Distro --set-sparse true
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Nie wlaczono sparse. Jesli chcesz: wsl --manage $Distro --set-sparse true --allow-unsafe" -ForegroundColor Yellow
+        Write-Host "Sparse VHD not enabled. To force it: wsl --manage $Distro --set-sparse true --allow-unsafe" -ForegroundColor Yellow
     }
 
-    wsl -d $Distro -- bash -c 'echo "Uzytkownik: $(whoami)"; df -h /'
-    if ($LASTEXITCODE -ne 0) { Fail 'Dystrybucja nie uruchomila sie po imporcie.' }
+    wsl -d $Distro -- bash -c 'echo "User: $(whoami)"; df -h /'
+    if ($LASTEXITCODE -ne 0) { Fail 'The distro failed to start after the import.' }
     wsl --set-default $Distro | Out-Null
 } finally {
     if ($dockerWasRunning) { Start-DockerDesktop }
 }
 
-Write-Host "`nOdtworzono '$Distro'." -ForegroundColor Green
+Write-Host "`nRestored '$Distro'." -ForegroundColor Green

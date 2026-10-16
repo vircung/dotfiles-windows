@@ -6,12 +6,12 @@ $env:WSL_UTF8 = '1'   # readable output from wsl.exe
 
 $DockerProcesses = 'Docker Desktop', 'com.docker.backend'
 
-function Fail($msg) { Write-Host "BLAD: $msg" -ForegroundColor Red; exit 1 }
+function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
 
 # Settings come from [env] in ~/.config/mise/config.local.toml; task arguments override them.
 function Assert-Config([hashtable]$Settings) {
     $missing = @($Settings.Keys | Where-Object { -not $Settings[$_] })
-    if ($missing) { Fail "Brak ustawien: $($missing -join ', '). Ustaw je w sekcji [env] pliku ~/.config/mise/config.local.toml albo podaj jako argumenty." }
+    if ($missing) { Fail "Missing settings: $($missing -join ', '). Set them in the [env] section of ~/.config/mise/config.local.toml or pass them as arguments." }
 }
 
 # "Ubuntu, Ubuntu-OpenRig" -> 'Ubuntu', 'Ubuntu-OpenRig'. Wrap the result in @(), since PowerShell unwraps single-element arrays.
@@ -32,17 +32,17 @@ function Get-DistroInfo($Distro) {
 function Stop-DockerAndWsl {
     $wasRunning = [bool](Get-Process $DockerProcesses -ErrorAction SilentlyContinue)
     if ($wasRunning) {
-        Write-Host 'Zatrzymywanie Docker Desktop...'
+        Write-Host 'Stopping Docker Desktop...'
         docker desktop stop --timeout 120 | Out-Host
         if ($LASTEXITCODE -ne 0) { Get-Process $DockerProcesses -ErrorAction SilentlyContinue | Stop-Process -Force }
     }
-    Write-Host 'Zatrzymywanie WSL...'
+    Write-Host 'Stopping WSL...'
     wsl --shutdown | Out-Host
     $wasRunning
 }
 
 function Start-DockerDesktop {
-    Write-Host 'Uruchamianie Docker Desktop...'
+    Write-Host 'Starting Docker Desktop...'
     docker desktop start --detach | Out-Host
-    if ($LASTEXITCODE -ne 0) { Write-Host 'Nie udalo sie uruchomic Docker Desktop - uruchom go recznie.' -ForegroundColor Yellow }
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Failed to start Docker Desktop - start it manually.' -ForegroundColor Yellow }
 }
