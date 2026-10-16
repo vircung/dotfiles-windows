@@ -1,4 +1,4 @@
-#!powershell -NoProfile -ExecutionPolicy Bypass -File
+#Requires -Version 7.4
 #MISE description="Odtworzenie dystrybucji WSL z kopii (domyslnie najnowszej)"
 # Uzycie: mise run wsl:restore [-- -Distro Ubuntu] [-Previous | -File <sciezka.tar.gz>] [-InstallDir C:\WSL\Ubuntu] [-Force]
 # Domyslne wartosci z ~/.config/mise/config.local.toml:
@@ -30,7 +30,7 @@ if (-not $File) {
     Assert-Config @{ WSL_BACKUP_DIR = $BackupDir }
     $dir = Join-Path $BackupDir $Distro
     if (-not (Test-Path $dir)) { Fail "Brak katalogu $dir (czy dysk jest podpiety?)." }
-    $idx, $what = if ($Previous) { 1, 'poprzedniej' } else { 0, 'zadnej' }
+    $idx, $what = $Previous ? (1, 'poprzedniej') : (0, 'zadnej')
     $backups = @(Get-ChildItem $dir -Filter '*.tar.gz' | Sort-Object Name -Descending)
     if ($backups.Count -le $idx) { Fail "Brak $what kopii '$Distro' w $dir." }
     $File = $backups[$idx].FullName
@@ -50,7 +50,7 @@ if (-not $InstallDir) {
 }
 
 Write-Host ('Kopia:       {0} ({1:N1} GB, {2})' -f $archive.FullName, ($archive.Length / 1GB), $archive.LastWriteTime)
-Write-Host "Dystrybucja: $Distro $(if ($info) {'(ISTNIEJE - zostanie USUNIETA)'} else {'(nowa)'})"
+Write-Host "Dystrybucja: $Distro $($info ? '(ISTNIEJE - zostanie USUNIETA)' : '(nowa)')"
 Write-Host "Lokalizacja: $InstallDir"
 
 if (-not $Force) {

@@ -1,4 +1,4 @@
-#!powershell -NoProfile -ExecutionPolicy Bypass -File
+#Requires -Version 7.4
 #MISE description="Kopia zapasowa dystrybucji WSL (tar.gz, rotacja wg WSL_BACKUP_KEEP)"
 # Uzycie: mise run wsl:backup [-- -Distro Ubuntu,Ubuntu-OpenRig -BackupDir D:\backup\wsl -Keep 2 -Live]
 # Domyslne wartosci: WSL_BACKUP_DISTROS, WSL_BACKUP_DIR, WSL_BACKUP_KEEP z ~/.config/mise/config.local.toml.

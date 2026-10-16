@@ -30,9 +30,9 @@ The script is idempotent and safe to re-run. It:
 - `mise/tasks/` - file tasks, e.g. `mise run wsl:backup`, `mise run wsl:restore`
 - `mise/lib/` - code shared by the tasks (outside `tasks/` so mise doesn't treat it as a task)
 
-`.ps1` tasks must start with `#!powershell -NoProfile -ExecutionPolicy Bypass -File`
-(otherwise mise runs them with `pwsh`) and must be ASCII-only
-(Windows PowerShell 5.1 reads BOM-less files as ANSI).
+mise runs `.ps1` tasks with `pwsh -NoProfile -File` (PowerShell 7, installed by mise);
+tasks declare `#Requires -Version 7.4`. `install.ps1` itself must stay compatible with
+Windows PowerShell 5.1, since it runs before `pwsh` is installed.
 
 ### WSL tasks
 
