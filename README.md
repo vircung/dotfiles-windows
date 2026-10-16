@@ -11,8 +11,8 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 The script is idempotent and safe to re-run. It:
 
 1. Ensures mise is installed, installing it with winget (`jdx.mise`) if missing.
-   Update mise with `mise self-update`, not `winget upgrade` (which may overwrite
-   a newer version with the older one from the winget repository).
+   mise updates itself (`mise self-update`), so the script pins it in winget: `winget upgrade --all`
+   skips it instead of overwriting a newer version with the older one from the winget repository.
 2. Creates missing local files (`*.local.*`, git-ignored) from their `*.local.*.example` templates.
 3. Links repo entries to their targets. Directories are linked as junctions (no admin needed),
    files as symlinks (requires Developer Mode or admin). An existing target that is not

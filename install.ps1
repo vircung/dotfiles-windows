@@ -22,6 +22,18 @@ if (Get-Command mise -ErrorAction SilentlyContinue) {
     Write-Host "OK:      mise $((mise --version) -split ' ' | Select-Object -First 1)" -ForegroundColor Green
 }
 
+# mise updates itself (`mise self-update`); a winget pin makes `winget upgrade --all` skip it,
+# so it doesn't reinstall winget's older build.
+if (Get-Command winget -ErrorAction SilentlyContinue) {
+    if (winget pin list --id jdx.mise --exact | Select-String 'jdx\.mise') {
+        Write-Host 'OK:      winget pin jdx.mise'
+    } elseif (winget list --id jdx.mise --exact --accept-source-agreements | Select-String 'jdx\.mise') {
+        winget pin add --id jdx.mise --exact | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "winget pin add jdx.mise failed with exit code $LASTEXITCODE." }
+        Write-Host 'PIN:     jdx.mise (skipped by winget upgrade --all)' -ForegroundColor Green
+    }
+}
+
 # --- Local files (*.local.*, git-ignored) created from *.example templates ---
 Get-ChildItem $PSScriptRoot -Recurse -File -Filter '*.local.*.example' | ForEach-Object {
     $local = $_.FullName -replace '\.example$', ''
