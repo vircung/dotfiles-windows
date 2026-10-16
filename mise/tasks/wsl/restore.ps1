@@ -1,12 +1,12 @@
 #Requires -Version 7.4
-#MISE description="Odtworzenie dystrybucji WSL z kopii (domyslnie najnowszej)"
-# Uzycie: mise run wsl:restore [-- -Distro Ubuntu] [-Previous | -File <sciezka.tar.gz>] [-InstallDir C:\WSL\Ubuntu] [-Force]
-# Domyslne wartosci z ~/.config/mise/config.local.toml:
-#   -Distro      jedyna dystrybucja z WSL_BACKUP_DISTROS (przy kilku trzeba ja podac)
-#   -BackupDir   WSL_BACKUP_DIR (kopie w <katalog>\<dystrybucja>\)
-#   -InstallDir  obecna lokalizacja dystrybucji, a jesli jej nie ma: WSL_DISTRO_DIR\<dystrybucja>
-# UWAGA: usuwa obecna dystrybucje (wsl --unregister) i zastepuje ja kopia.
-# Na czas odtwarzania zatrzymuje Docker Desktop i WSL, potem uruchamia Dockera ponownie.
+#MISE description="Restore a WSL distro from a backup (newest by default)"
+# Usage: mise run wsl:restore [-- -Distro Ubuntu] [-Previous | -File <path.tar.gz>] [-InstallDir C:\WSL\Ubuntu] [-Force]
+# Defaults from ~/.config/mise/config.local.toml:
+#   -Distro      the only distro in WSL_BACKUP_DISTROS (required if there are several)
+#   -BackupDir   WSL_BACKUP_DIR (backups in <dir>\<distro>\)
+#   -InstallDir  the distro's current location, or WSL_DISTRO_DIR\<distro> if it doesn't exist
+# WARNING: removes the current distro (wsl --unregister) and replaces it with the backup.
+# Stops Docker Desktop and WSL during the restore, then restarts Docker.
 
 param(
     [string]$Distro,
@@ -25,7 +25,7 @@ if (-not $Distro) {
     $Distro = $configured[0]
 }
 
-# --- Wybor kopii ---
+# --- Pick the backup ---
 if (-not $File) {
     Assert-Config @{ WSL_BACKUP_DIR = $BackupDir }
     $dir = Join-Path $BackupDir $Distro
@@ -38,7 +38,7 @@ if (-not $File) {
 $archive = Get-Item $File -ErrorAction SilentlyContinue
 if (-not $archive) { Fail "Nie znaleziono pliku $File." }
 
-# --- Lokalizacja instalacji: obecna lokalizacja dystrybucji albo WSL_DISTRO_DIR\<dystrybucja> ---
+# --- Install location: the distro's current location or WSL_DISTRO_DIR\<distro> ---
 $info = Get-DistroInfo $Distro
 if (-not $InstallDir) {
     if ($info) {
@@ -58,8 +58,8 @@ if (-not $Force) {
     if ($answer -cne $Distro) { Write-Host 'Anulowano.'; exit 1 }
 }
 
-# --- Sprawdzenie archiwum PRZED usunieciem dystrybucji ---
-# Listing (setki tysiecy linii) trafia prosto do strumienia null, z pominieciem potoku PowerShella.
+# --- Verify the archive BEFORE removing the distro ---
+# The listing (hundreds of thousands of lines) goes straight to a null stream, bypassing the PowerShell pipeline.
 Write-Host "`nSprawdzanie integralnosci archiwum (kilka minut)..."
 $psi = New-Object Diagnostics.ProcessStartInfo "$env:SystemRoot\System32\tar.exe", "-tzf `"$($archive.FullName)`""
 $psi.UseShellExecute = $false
@@ -70,7 +70,7 @@ $tar.WaitForExit()
 if ($tar.ExitCode -ne 0) { Fail 'Archiwum jest uszkodzone - nic nie zostalo zmienione.' }
 Write-Host 'Archiwum OK.' -ForegroundColor Green
 
-# --- Zastapienie dystrybucji ---
+# --- Replace the distro ---
 $dockerWasRunning = $false
 try {
     $dockerWasRunning = Stop-DockerAndWsl

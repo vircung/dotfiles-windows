@@ -1,10 +1,10 @@
-# Szablon ustawien lokalnych. install.ps1 kopiuje go do config.local.toml, jesli ten nie istnieje.
-# config.local.toml jest w .gitignore - dostosuj sciezki do komputera.
-# mise nie jest aktywowany w profilu PowerShella, wiec te zmienne widza tylko `mise run` / `mise exec`.
+# Local settings template. install.ps1 copies it to config.local.toml if that doesn't exist.
+# config.local.toml is git-ignored - adjust the paths to the machine.
+# mise is not activated in the PowerShell profile, so only `mise run` / `mise exec` see these variables.
 
 [env]
-# Taski wsl:backup / wsl:restore
-WSL_BACKUP_DIR     = 'D:\backup\wsl'   # kopie trafiaja do <katalog>\<dystrybucja>\
-WSL_BACKUP_DISTROS = 'Ubuntu'          # lista po przecinku, np. 'Ubuntu,Ubuntu-OpenRig'
-WSL_BACKUP_KEEP    = '2'               # ile kopii trzymac na dystrybucje (aktualna + poprzednie)
-WSL_DISTRO_DIR     = 'C:\WSL'          # gdzie restore instaluje dystrybucje, ktorej nie ma: <katalog>\<dystrybucja>
+# wsl:backup / wsl:restore tasks
+WSL_BACKUP_DIR     = 'D:\backup\wsl'   # backups go to <dir>\<distro>\
+WSL_BACKUP_DISTROS = 'Ubuntu'          # comma-separated, e.g. 'Ubuntu,Ubuntu-OpenRig'
+WSL_BACKUP_KEEP    = '2'               # backups to keep per distro (latest + previous)
+WSL_DISTRO_DIR     = 'C:\WSL'          # where restore installs a distro that doesn't exist: <dir>\<distro>

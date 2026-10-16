@@ -1,10 +1,10 @@
-# Linkuje pliki i katalogi z tego repo do ich miejsc w systemie (Windows).
-# Musi dzialac w Windows PowerShell 5.1 (na nowym komputerze pwsh instaluje dopiero `mise install`).
-# Uruchom: powershell -ExecutionPolicy Bypass -File install.ps1
+# Links files and directories from this repo into their places on the system (Windows).
+# Must work in Windows PowerShell 5.1 (on a new machine pwsh is only installed by `mise install`).
+# Run: powershell -ExecutionPolicy Bypass -File install.ps1
 #
-# Katalogi -> junction (nie wymaga administratora ani trybu dewelopera).
-# Pliki    -> symlink  (wymaga trybu dewelopera albo administratora).
-# Istniejacy cel, ktory nie jest juz linkiem do repo, jest przenoszony do <cel>.backup-<data>.
+# Directories -> junction (no admin or Developer Mode needed).
+# Files       -> symlink  (requires Developer Mode or admin).
+# An existing target that is not already a link to this repo is moved to <target>.backup-<date>.
 
 $ErrorActionPreference = 'Stop'
 
@@ -16,13 +16,13 @@ if (Get-Command mise -ErrorAction SilentlyContinue) {
     Write-Host 'Instalowanie mise (winget)...'
     winget install --id jdx.mise --exact --source winget --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) { throw "winget install jdx.mise zakonczyl sie kodem $LASTEXITCODE." }
-    # winget dopisuje mise do PATH w rejestrze; odswiezenie PATH tej sesji
+    # winget adds mise to PATH in the registry; refresh PATH for this session
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
     if (-not (Get-Command mise -ErrorAction SilentlyContinue)) { throw 'mise zainstalowany, ale nie ma go w PATH - otworz nowy terminal i uruchom skrypt ponownie.' }
     Write-Host "OK:      mise $((mise --version) -split ' ' | Select-Object -First 1)" -ForegroundColor Green
 }
 
-# --- Pliki lokalne (*.local.*, poza gitem) tworzone z szablonow *.example ---
+# --- Local files (*.local.*, git-ignored) created from *.example templates ---
 Get-ChildItem $PSScriptRoot -Recurse -File -Filter '*.local.*.example' | ForEach-Object {
     $local = $_.FullName -replace '\.example$', ''
     if (Test-Path $local) { return }
@@ -30,7 +30,7 @@ Get-ChildItem $PSScriptRoot -Recurse -File -Filter '*.local.*.example' | ForEach
     Write-Host "NOWY:    $local (z szablonu - dostosuj do tego komputera)" -ForegroundColor Yellow
 }
 
-# --- Linki: zrodlo w repo => cel w systemie ---
+# --- Links: repo source => system target ---
 $links = [ordered]@{
     'mise' = "$env:USERPROFILE\.config\mise"
 }
@@ -57,7 +57,7 @@ foreach ($entry in $links.GetEnumerator()) {
     Write-Host "LINK:    $target -> $source ($type)" -ForegroundColor Green
 }
 
-# --- Narzedzia z mise/config.toml (m.in. pwsh, ktorego wymagaja taski) ---
+# --- Tools from mise/config.toml (incl. pwsh, required by the tasks) ---
 Write-Host 'mise install...'
 mise install
 if ($LASTEXITCODE -ne 0) { throw "mise install zakonczyl sie kodem $LASTEXITCODE." }

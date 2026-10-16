@@ -1,4 +1,4 @@
-# Ustawienia lokalne (specyficzne dla komputera) - nie trafiaja do repo
+# Local, machine-specific settings - kept out of the repo
 *.local.*
-# ...poza szablonami, z ktorych install.ps1 tworzy brakujace pliki lokalne
+# ...except templates, from which install.ps1 creates missing local files
 !*.example

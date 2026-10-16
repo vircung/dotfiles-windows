@@ -1,9 +1,9 @@
 #Requires -Version 7.4
-#MISE description="Kopia zapasowa dystrybucji WSL (tar.gz, rotacja wg WSL_BACKUP_KEEP)"
-# Uzycie: mise run wsl:backup [-- -Distro Ubuntu,Ubuntu-OpenRig -BackupDir D:\backup\wsl -Keep 2 -Live]
-# Domyslne wartosci: WSL_BACKUP_DISTROS, WSL_BACKUP_DIR, WSL_BACKUP_KEEP z ~/.config/mise/config.local.toml.
-# Domyslnie zatrzymuje Docker Desktop i WSL na czas eksportu (spojna kopia), potem uruchamia Dockera ponownie.
-# -Live: eksport bez zatrzymywania czegokolwiek.
+#MISE description="Back up WSL distros (tar.gz, rotated per WSL_BACKUP_KEEP)"
+# Usage: mise run wsl:backup [-- -Distro Ubuntu,Ubuntu-OpenRig -BackupDir D:\backup\wsl -Keep 2 -Live]
+# Defaults: WSL_BACKUP_DISTROS, WSL_BACKUP_DIR, WSL_BACKUP_KEEP from ~/.config/mise/config.local.toml.
+# By default stops Docker Desktop and WSL during the export (consistent snapshot), then restarts Docker.
+# -Live: export without stopping anything.
 
 param(
     [string]$Distro    = $env:WSL_BACKUP_DISTROS,
@@ -16,13 +16,13 @@ param(
 
 Assert-Config @{ WSL_BACKUP_DISTROS = $Distro; WSL_BACKUP_DIR = $BackupDir; WSL_BACKUP_KEEP = $Keep }
 
-# --- Dysk docelowy ---
+# --- Target drive ---
 $drive = [IO.DriveInfo](Split-Path $BackupDir -Qualifier)
 if (-not $drive.IsReady) { Fail "Dysk $($drive.Name) nie jest podpiety." }
 
-# --- Dystrybucje ---
-# Kazda dystrybucja ma wlasny podkatalog, wiec rotacja "Ubuntu" nie dotyka kopii "Ubuntu-OpenRig".
-# Zapis do pliku .partial i zmiana nazwy dopiero po sukcesie: nieudana kopia nie wypiera dobrych.
+# --- Distros ---
+# Each distro has its own subdirectory, so rotating "Ubuntu" doesn't touch "Ubuntu-OpenRig" backups.
+# Write to a .partial file and rename only on success: a failed backup never displaces good ones.
 $stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
 $jobs = [Collections.Generic.List[object]]::new()
 foreach ($name in Split-List $Distro) {
@@ -33,7 +33,7 @@ foreach ($name in Split-List $Distro) {
     $jobs.Add([pscustomobject]@{ Distro = $name; Dir = $dir; Final = $final; Partial = "$final.partial"; Vhd = $info.VhdPath; Exit = $null })
 }
 
-# Rozmiar .vhdx to gorne ograniczenie rozmiaru spakowanej kopii - nie trzeba uruchamiac dystrybucji.
+# The .vhdx size is an upper bound on the compressed backup size - no need to start the distro.
 $needGB = [math]::Ceiling(($jobs | ForEach-Object { (Get-Item $_.Vhd).Length } | Measure-Object -Sum).Sum / 1GB) + 5
 $freeGB = [math]::Floor($drive.AvailableFreeSpace / 1GB)
 if ($freeGB -lt $needGB) { Fail "Za malo miejsca na $($drive.Name): wolne $freeGB GB, potrzeba ~$needGB GB." }
@@ -43,7 +43,7 @@ foreach ($job in $jobs) {
     Get-ChildItem $job.Dir -Filter '*.partial' | Remove-Item -Force
 }
 
-# --- Eksport ---
+# --- Export ---
 $dockerWasRunning = $false
 try {
     if (-not $Live) { $dockerWasRunning = Stop-DockerAndWsl }
@@ -58,7 +58,7 @@ try {
     if ($dockerWasRunning) { Start-DockerDesktop }
 }
 
-# --- Zatwierdzenie i rotacja ---
+# --- Commit and rotate ---
 $failed = @()
 foreach ($job in $jobs) {
     Write-Host "`n[$($job.Distro)]"

@@ -1,23 +1,23 @@
-# Wspolne funkcje taskow mise wsl:* - dolaczane przez dot-source z tasks\wsl\*.ps1.
-# Lezy poza katalogiem tasks, zeby mise nie traktowal go jako taska.
+# Shared functions for the wsl:* mise tasks - dot-sourced from tasks\wsl\*.ps1.
+# Lives outside the tasks directory so mise doesn't treat it as a task.
 
 $ErrorActionPreference = 'Stop'
-$env:WSL_UTF8 = '1'   # czytelny output z wsl.exe
+$env:WSL_UTF8 = '1'   # readable output from wsl.exe
 
 $DockerProcesses = 'Docker Desktop', 'com.docker.backend'
 
 function Fail($msg) { Write-Host "BLAD: $msg" -ForegroundColor Red; exit 1 }
 
-# Konfiguracja pochodzi z [env] w ~/.config/mise/config.local.toml; argumenty taska ja nadpisuja.
+# Settings come from [env] in ~/.config/mise/config.local.toml; task arguments override them.
 function Assert-Config([hashtable]$Settings) {
     $missing = @($Settings.Keys | Where-Object { -not $Settings[$_] })
     if ($missing) { Fail "Brak ustawien: $($missing -join ', '). Ustaw je w sekcji [env] pliku ~/.config/mise/config.local.toml albo podaj jako argumenty." }
 }
 
-# "Ubuntu, Ubuntu-OpenRig" -> 'Ubuntu', 'Ubuntu-OpenRig'. Wynik owijaj w @(), bo PowerShell rozpakowuje jednoelementowe tablice.
+# "Ubuntu, Ubuntu-OpenRig" -> 'Ubuntu', 'Ubuntu-OpenRig'. Wrap the result in @(), since PowerShell unwraps single-element arrays.
 function Split-List($value) { $value -split ',' | ForEach-Object Trim | Where-Object { $_ } }
 
-# BasePath i sciezka .vhdx dystrybucji z rejestru (wsl.exe ich nie podaje); $null, jesli nie istnieje.
+# Distro BasePath and .vhdx path from the registry (wsl.exe doesn't expose them); $null if it doesn't exist.
 function Get-DistroInfo($Distro) {
     $p = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss |
         ForEach-Object { Get-ItemProperty $_.PSPath } |
@@ -27,8 +27,8 @@ function Get-DistroInfo($Distro) {
     [pscustomobject]@{ BasePath = $base; VhdPath = Join-Path $base $p.VhdFileName }
 }
 
-# Zatrzymuje Docker Desktop (jesli dziala) i caly WSL. Zwraca $true, jesli Docker dzialal.
-# Wywolujacy uruchamia Dockera z powrotem w bloku finally przez Start-DockerDesktop.
+# Stops Docker Desktop (if running) and all of WSL. Returns $true if Docker was running.
+# The caller restarts Docker in a finally block via Start-DockerDesktop.
 function Stop-DockerAndWsl {
     $wasRunning = [bool](Get-Process $DockerProcesses -ErrorAction SilentlyContinue)
     if ($wasRunning) {
