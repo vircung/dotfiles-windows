@@ -4,3 +4,6 @@ claude = "latest"
 codex = "latest"
 powershell = "latest"
 python = "latest"
+
+[settings]
+minimum_release_age = "0s"
