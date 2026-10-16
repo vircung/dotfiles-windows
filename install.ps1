@@ -1,4 +1,5 @@
 # Linkuje pliki i katalogi z tego repo do ich miejsc w systemie (Windows).
+# Musi dzialac w Windows PowerShell 5.1 (na nowym komputerze pwsh instaluje dopiero `mise install`).
 # Uruchom: powershell -ExecutionPolicy Bypass -File install.ps1
 #
 # Katalogi -> junction (nie wymaga administratora ani trybu dewelopera).
@@ -55,3 +56,8 @@ foreach ($entry in $links.GetEnumerator()) {
     New-Item -ItemType $type -Path $target -Target $source | Out-Null
     Write-Host "LINK:    $target -> $source ($type)" -ForegroundColor Green
 }
+
+# --- Narzedzia z mise/config.toml (m.in. pwsh, ktorego wymagaja taski) ---
+Write-Host 'mise install...'
+mise install
+if ($LASTEXITCODE -ne 0) { throw "mise install zakonczyl sie kodem $LASTEXITCODE." }

@@ -17,6 +17,7 @@ The script is idempotent and safe to re-run. It:
 3. Links repo entries to their targets. Directories are linked as junctions (no admin needed),
    files as symlinks (requires Developer Mode or admin). An existing target that is not
    already a link to this repo is moved to `<target>.backup-<date>`.
+4. Runs `mise install` to install the tools from `mise/config.toml` (including `pwsh`).
 
 | Repo   | Target           |
 |--------|------------------|
