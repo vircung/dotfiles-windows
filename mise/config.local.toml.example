@@ -8,3 +8,4 @@ WSL_BACKUP_DIR     = 'D:\backup\wsl'   # backups go to <dir>\<distro>\
 WSL_BACKUP_DISTROS = 'Ubuntu'          # comma-separated, e.g. 'Ubuntu,Ubuntu-OpenRig'
 WSL_BACKUP_KEEP    = '2'               # backups to keep per distro (latest + previous)
 WSL_DISTRO_DIR     = 'C:\WSL'          # where restore installs a distro that doesn't exist: <dir>\<distro>
+WSL_BACKUP_ZSTD    = '-3 --long'       # zstd compression options for wsl:backup (higher levels: slower, barely smaller)

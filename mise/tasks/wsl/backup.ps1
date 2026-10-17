@@ -1,20 +1,28 @@
 #Requires -Version 7.4
-#MISE description="Back up WSL distros (tar.gz, rotated per WSL_BACKUP_KEEP)"
+#MISE description="Back up WSL distros (vhdx.zst, rotated per WSL_BACKUP_KEEP)"
 # Usage: mise run wsl:backup [-- -Distro Ubuntu,Ubuntu-OpenRig -BackupDir D:\backup\wsl -Keep 2 -Live]
 # Defaults: WSL_BACKUP_DISTROS, WSL_BACKUP_DIR, WSL_BACKUP_KEEP from ~/.config/mise/config.local.toml.
-# By default stops Docker Desktop and WSL during the export (consistent snapshot), then restarts Docker.
-# -Live: export without stopping anything.
+# By default stops Docker Desktop and WSL, compresses the distro's ext4.vhdx with zstd (all cores),
+# then restarts Docker. Copying the whole disk image is several times faster than wsl --export.
+# -Live: nothing is stopped; wsl --export (a tar of the running distro) is piped through zstd instead,
+# since an image of a running distro's disk could be inconsistent.
+# -Zstd (WSL_BACKUP_ZSTD, default '-3 --long'): zstd compression options, e.g. '-6 --long'.
+# Requires zstd (winget install Meta.Zstandard).
 
 param(
     [string]$Distro    = $env:WSL_BACKUP_DISTROS,
     [string]$BackupDir = $env:WSL_BACKUP_DIR,
     [int]   $Keep      = $env:WSL_BACKUP_KEEP,
+    [string]$Zstd      = $env:WSL_BACKUP_ZSTD,
     [switch]$Live
 )
 
 . "$PSScriptRoot\..\..\lib\wsl-common.ps1"
 
 Assert-Config @{ WSL_BACKUP_DISTROS = $Distro; WSL_BACKUP_DIR = $BackupDir; WSL_BACKUP_KEEP = $Keep }
+$zstdExe  = Get-Zstd
+$zstdArgs = @('-T0') + @(($Zstd ? $Zstd : '-3 --long') -split '\s+' | Where-Object { $_ }) + '--check'
+$ext      = $Live ? 'tar.zst' : 'vhdx.zst'
 
 # --- Target drive ---
 $drive = [IO.DriveInfo](Split-Path $BackupDir -Qualifier)
@@ -29,7 +37,7 @@ foreach ($name in Split-List $Distro) {
     $info = Get-DistroInfo $name
     if (-not $info) { Fail "Distro '$name' not found." }
     $dir   = Join-Path $BackupDir $name
-    $final = Join-Path $dir "$name-$stamp.tar.gz"
+    $final = Join-Path $dir "$name-$stamp.$ext"
     $jobs.Add([pscustomobject]@{ Distro = $name; Dir = $dir; Final = $final; Partial = "$final.partial"; Vhd = $info.VhdPath; Exit = $null })
 }
 
@@ -48,10 +56,15 @@ $dockerWasRunning = $false
 try {
     if (-not $Live) { $dockerWasRunning = Stop-DockerAndWsl }
     foreach ($job in $jobs) {
-        Write-Host "`nExporting '$($job.Distro)' -> $($job.Final) (takes several minutes)"
+        Write-Host "`nBacking up '$($job.Distro)' -> $($job.Final) (takes several minutes)"
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        wsl --export $job.Distro $job.Partial --format tar.gz
-        $job.Exit = $LASTEXITCODE
+        if ($Live) {
+            $codes = Invoke-BytePipe ('wsl.exe', '--export', $job.Distro, '-') (@($zstdExe) + $zstdArgs + '-q', '-f', '-o', $job.Partial)
+            $job.Exit = ($codes | Where-Object { $_ -ne 0 } | Select-Object -First 1) ?? 0
+        } else {
+            & $zstdExe @zstdArgs -f $job.Vhd -o $job.Partial
+            $job.Exit = $LASTEXITCODE
+        }
         Write-Host ('Time: {0:N1} min' -f $sw.Elapsed.TotalMinutes)
     }
 } finally {
@@ -64,14 +77,14 @@ foreach ($job in $jobs) {
     Write-Host "`n[$($job.Distro)]"
     if ($job.Exit -ne 0 -or -not (Get-Item $job.Partial -ErrorAction SilentlyContinue).Length) {
         Remove-Item $job.Partial -Force -ErrorAction SilentlyContinue
-        Write-Host "ERROR: wsl --export failed with exit code $($job.Exit). Previous backups were left untouched." -ForegroundColor Red
+        Write-Host "ERROR: Backup failed with exit code $($job.Exit). Previous backups were left untouched." -ForegroundColor Red
         $failed += $job.Distro
         continue
     }
     $backup = Rename-Item $job.Partial (Split-Path $job.Final -Leaf) -PassThru
     Write-Host ('OK: {0:N1} GB' -f ($backup.Length / 1GB)) -ForegroundColor Green
 
-    $all = @(Get-ChildItem $job.Dir -Filter '*.tar.gz' | Sort-Object Name -Descending)
+    $all = Get-Backups $job.Dir
     $all | Select-Object -Skip $Keep | ForEach-Object {
         Write-Host "Removing old backup: $($_.Name)"
         Remove-Item $_.FullName -Force

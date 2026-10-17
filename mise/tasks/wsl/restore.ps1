@@ -1,12 +1,14 @@
 #Requires -Version 7.4
 #MISE description="Restore a WSL distro from a backup (newest by default)"
-# Usage: mise run wsl:restore [-- -Distro Ubuntu] [-Previous | -File <path.tar.gz>] [-InstallDir C:\WSL\Ubuntu] [-Force]
+# Usage: mise run wsl:restore [-- -Distro Ubuntu] [-Previous | -File <path>] [-InstallDir C:\WSL\Ubuntu] [-Force]
 # Defaults from ~/.config/mise/config.local.toml:
 #   -Distro      the only distro in WSL_BACKUP_DISTROS (required if there are several)
 #   -BackupDir   WSL_BACKUP_DIR (backups in <dir>\<distro>\)
 #   -InstallDir  the distro's current location, or WSL_DISTRO_DIR\<distro> if it doesn't exist
+# Backups: .vhdx.zst (disk image), .tar.zst (-Live backup) or .tar.gz (older backups).
 # WARNING: removes the current distro (wsl --unregister) and replaces it with the backup.
 # Stops Docker Desktop and WSL during the restore, then restarts Docker.
+# Requires zstd for .zst backups (winget install Meta.Zstandard).
 
 param(
     [string]$Distro,
@@ -28,15 +30,23 @@ if (-not $Distro) {
 # --- Pick the backup ---
 if (-not $File) {
     Assert-Config @{ WSL_BACKUP_DIR = $BackupDir }
-    $dir = Join-Path $BackupDir $Distro
+    $dir = [IO.Path]::Combine($BackupDir, $Distro)   # Join-Path throws on a missing drive
     if (-not (Test-Path $dir)) { Fail "Directory $dir not found (is the drive connected?)." }
     $idx, $what = $Previous ? (1, 'previous') : (0, 'any')
-    $backups = @(Get-ChildItem $dir -Filter '*.tar.gz' | Sort-Object Name -Descending)
+    $backups = Get-Backups $dir
     if ($backups.Count -le $idx) { Fail "No $what backup of '$Distro' in $dir." }
     $File = $backups[$idx].FullName
 }
 $archive = Get-Item $File -ErrorAction SilentlyContinue
 if (-not $archive) { Fail "File $File not found." }
+$format = switch -Regex ($archive.Name) {
+    '\.vhdx\.zst$' { 'vhdx.zst' }
+    '\.tar\.zst$'  { 'tar.zst' }
+    '\.tar\.gz$'   { 'tar.gz' }
+    default        { Fail "Unknown backup format: $($archive.Name) (expected .vhdx.zst, .tar.zst or .tar.gz)." }
+}
+# --long=31 allows any window size, so backups made with WSL_BACKUP_ZSTD='... --long' decompress too.
+if ($format -like '*.zst') { $zstd = Get-Zstd; $zstdLong = '--long=31' }
 
 # --- Install location: the distro's current location or WSL_DISTRO_DIR\<distro> ---
 $info = Get-DistroInfo $Distro
@@ -46,6 +56,24 @@ if (-not $InstallDir) {
     } else {
         Assert-Config @{ WSL_DISTRO_DIR = $env:WSL_DISTRO_DIR }
         $InstallDir = Join-Path $env:WSL_DISTRO_DIR $Distro
+    }
+}
+
+# A .vhdx backup is decompressed straight into place; unregistering the distro deletes its current disk.
+if ($format -eq 'vhdx.zst') {
+    $vhd = Join-Path $InstallDir 'ext4.vhdx'
+    if ((Test-Path $vhd) -and -not ($info -and $info.VhdPath -eq $vhd)) { Fail "$vhd already exists and doesn't belong to '$Distro' - remove it or pick another -InstallDir." }
+
+    # Decompressed size from the zstd frame header; free space counts the disk that unregister will delete.
+    $size = Get-ZstdContentSize $archive.FullName
+    if ($size) {
+        $needGB = [math]::Ceiling($size / 1GB) + 1
+        $drive  = [IO.DriveInfo](Split-Path ([IO.Path]::GetFullPath($InstallDir)) -Qualifier)
+        $freed  = ($info -and (Split-Path $info.VhdPath -Qualifier) -eq $drive.Name.TrimEnd('\')) ? (Get-AllocatedSize $info.VhdPath) : 0
+        $freeGB = [math]::Floor(($drive.AvailableFreeSpace + $freed) / 1GB)
+        if ($freeGB -lt $needGB) { Fail "Not enough space on $($drive.Name): $freeGB GB available (after removing the current distro), ~$needGB GB needed." }
+    } else {
+        Write-Host 'Decompressed size unknown - skipping the free space check.' -ForegroundColor Yellow
     }
 }
 
@@ -59,15 +87,19 @@ if (-not $Force) {
 }
 
 # --- Verify the archive BEFORE removing the distro ---
-# The listing (hundreds of thousands of lines) goes straight to a null stream, bypassing the PowerShell pipeline.
+# Checksums only: listing the tar with Windows tar.exe fails on file names it can't convert.
 Write-Host "`nVerifying archive integrity (takes a few minutes)..."
-$psi = New-Object Diagnostics.ProcessStartInfo "$env:SystemRoot\System32\tar.exe", "-tzf `"$($archive.FullName)`""
-$psi.UseShellExecute = $false
-$psi.RedirectStandardOutput = $true
-$tar = [Diagnostics.Process]::Start($psi)
-$tar.StandardOutput.BaseStream.CopyTo([IO.Stream]::Null)
-$tar.WaitForExit()
-if ($tar.ExitCode -ne 0) { Fail 'The archive is corrupted - nothing was changed.' }
+if ($format -eq 'tar.gz') {
+    $ok = $true
+    $in = [IO.File]::OpenRead($archive.FullName)
+    try { ([IO.Compression.GZipStream]::new($in, [IO.Compression.CompressionMode]::Decompress)).CopyTo([IO.Stream]::Null, 1MB) }
+    catch { $ok = $false }
+    finally { $in.Dispose() }
+} else {
+    & $zstd -t -q $zstdLong $archive.FullName
+    $ok = $LASTEXITCODE -eq 0
+}
+if (-not $ok) { Fail 'The archive is corrupted - nothing was changed.' }
 Write-Host 'Archive OK.' -ForegroundColor Green
 
 # --- Replace the distro ---
@@ -81,14 +113,33 @@ try {
     New-Item -ItemType Directory -Force $InstallDir | Out-Null
 
     Write-Host "Importing '$Distro' into $InstallDir..."
-    wsl --import $Distro $InstallDir $archive.FullName
-    if ($LASTEXITCODE -ne 0) { Fail "wsl --import failed with exit code $LASTEXITCODE. Try manually: wsl --import $Distro `"$InstallDir`" `"$($archive.FullName)`"" }
+    switch ($format) {
+        'vhdx.zst' {
+            & $zstd -d -f $zstdLong $archive.FullName -o $vhd
+            if ($LASTEXITCODE -ne 0) {
+                Remove-Item $vhd -Force -ErrorAction SilentlyContinue
+                Fail "Decompressing the backup failed with exit code $LASTEXITCODE. The backup is intact; free up space on the drive and run the restore again."
+            }
+            wsl --import-in-place $Distro $vhd
+            if ($LASTEXITCODE -ne 0) { Fail "wsl --import-in-place failed with exit code $LASTEXITCODE. Try manually: wsl --import-in-place $Distro `"$vhd`"" }
+        }
+        'tar.zst' {
+            $codes = Invoke-BytePipe ($zstd, '-d', '-c', '-q', $zstdLong, $archive.FullName) ('wsl.exe', '--import', $Distro, $InstallDir, '-')
+            if ($codes -ne 0) { Fail "Import failed (zstd exit $($codes[0]), wsl --import exit $($codes[1]))." }
+        }
+        'tar.gz' {
+            wsl --import $Distro $InstallDir $archive.FullName
+            if ($LASTEXITCODE -ne 0) { Fail "wsl --import failed with exit code $LASTEXITCODE. Try manually: wsl --import $Distro `"$InstallDir`" `"$($archive.FullName)`"" }
+        }
+    }
 
     wsl --manage $Distro --set-sparse true
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Sparse VHD not enabled. To force it: wsl --manage $Distro --set-sparse true --allow-unsafe" -ForegroundColor Yellow
     }
 
+    # The decompressed disk image has its free space allocated too; trimming it shrinks the sparse .vhdx.
+    wsl -d $Distro -u root -- fstrim /
     wsl -d $Distro -- bash -c 'echo "User: $(whoami)"; df -h /'
     if ($LASTEXITCODE -ne 0) { Fail 'The distro failed to start after the import.' }
     wsl --set-default $Distro | Out-Null

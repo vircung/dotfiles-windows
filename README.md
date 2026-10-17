@@ -67,8 +67,16 @@ and `winget upgrade` could downgrade a `mise self-update`d binary.
 
 | Task          | Description |
 |---------------|-------------|
-| `wsl:backup`  | Exports the distros in `WSL_BACKUP_DISTROS` to `WSL_BACKUP_DIR\<distro>\` as `.tar.gz`, keeping `WSL_BACKUP_KEEP` copies. Stops Docker Desktop and WSL for a consistent snapshot and restarts Docker afterwards (`-Live` skips this). |
-| `wsl:restore` | Verifies the newest backup (or `-Previous` / `-File <path>`), then replaces the distro with it. Installs into the distro's current location, or `WSL_DISTRO_DIR\<distro>` for a new one. Asks for confirmation (`-Force` skips it). |
+| `wsl:backup`  | Backs up the distros in `WSL_BACKUP_DISTROS` to `WSL_BACKUP_DIR\<distro>\`, keeping `WSL_BACKUP_KEEP` copies. Stops Docker Desktop and WSL, compresses each distro's `ext4.vhdx` to `.vhdx.zst` and restarts Docker afterwards. `-Live` stops nothing and pipes `wsl --export` through zstd to `.tar.zst` instead. |
+| `wsl:restore` | Verifies the newest backup (or `-Previous` / `-File <path>`), then replaces the distro with it. Installs into the distro's current location, or `WSL_DISTRO_DIR\<distro>` for a new one. Asks for confirmation (`-Force` skips it). Restores `.vhdx.zst`, `.tar.zst` and older `.tar.gz` backups. |
 
 Settings come from `mise/config.local.toml`; task arguments override them,
 e.g. `mise run wsl:backup -- -Keep 3`.
+
+Both tasks need `zstd` (`Meta.Zstandard` in `winget/dev.json`). zstd uses all cores, and compressing
+the disk image avoids packing every file through `wsl --export`: on a 48 GB distro the backup took
+4.4 min instead of 43 min with `wsl --export --format tar.gz`, and the file was smaller (20.4 vs 21.4 GB).
+Disk images are taken only with WSL stopped, as an image of a running distro could be inconsistent.
+A restored image has its free space allocated, so the restore runs `fstrim` to shrink the sparse `.vhdx`.
+`WSL_BACKUP_ZSTD` (or `-Zstd`) sets the compression options, default `-3 --long`. Higher levels gain little
+on a disk image: `-6 --long` took 6.8 min for 19.8 GB, `-9 --long` 9.3 min for 19.5 GB.

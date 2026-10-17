@@ -16,6 +16,7 @@
         { "PackageIdentifier": "gerardog.gsudo" },
         { "PackageIdentifier": "Ghisler.TotalCommander" },
         { "PackageIdentifier": "Git.Git" },
+        { "PackageIdentifier": "Meta.Zstandard" },
         { "PackageIdentifier": "Microsoft.VisualStudioCode" },
         { "PackageIdentifier": "Microsoft.WindowsTerminal" },
         { "PackageIdentifier": "Microsoft.WSL" },
