@@ -82,3 +82,14 @@ release it, but WSL currently refuses sparse mode without `--allow-unsafe` (pote
 so the restore only prints that command and the `.vhdx` keeps its full size (64 GB for the 48 GB distro).
 `WSL_BACKUP_ZSTD` (or `-Zstd`) sets the compression options, default `-3 --long`. Higher levels gain little
 on a disk image: `-6 --long` took 6.8 min for 19.8 GB, `-9 --long` 9.3 min for 19.5 GB.
+
+### Docker tasks
+
+| Task             | Description |
+|------------------|-------------|
+| `docker:backup`  | Backs up the volumes in `DOCKER_BACKUP_VOLUMES` (`*` = all named volumes) to `DOCKER_BACKUP_DIR\<volume>\` as `.tar.zst`, keeping `DOCKER_BACKUP_KEEP` copies. Running containers that use a volume are stopped during its backup and started again. |
+| `docker:restore` | Verifies the newest backup of `-Volume <name>` (or `-Previous` / `-File <path>`), then replaces the volume's contents with it, creating the volume if needed. Asks for confirmation (`-Force` skips it). |
+
+Docker Desktop keeps images, containers and volumes on its own disk (`docker_data.vhdx`), which
+`wsl:backup` doesn't include. These tasks back up just the volumes: tar runs in a throwaway `debian:stable-slim`
+container (keeping owners and permissions) and zstd compresses on the host. Docker must be running.

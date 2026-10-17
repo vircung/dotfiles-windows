@@ -47,6 +47,10 @@ function Stop-DockerAndWsl {
     $wasRunning
 }
 
+function Format-Size([long]$Bytes) {
+    if ($Bytes -ge 1GB) { '{0:N1} GB' -f ($Bytes / 1GB) } elseif ($Bytes -ge 1MB) { '{0:N1} MB' -f ($Bytes / 1MB) } else { '{0:N1} KB' -f ($Bytes / 1KB) }
+}
+
 # zstd from winget (Meta.Zstandard); fails if it's missing.
 function Get-Zstd {
     $cmd = Get-Command zstd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1

@@ -9,3 +9,8 @@ WSL_BACKUP_DISTROS = 'Ubuntu'          # comma-separated, e.g. 'Ubuntu,Ubuntu-Op
 WSL_BACKUP_KEEP    = '2'               # backups to keep per distro (latest + previous)
 WSL_DISTRO_DIR     = 'C:\WSL'          # where restore installs a distro that doesn't exist: <dir>\<distro>
 WSL_BACKUP_ZSTD    = '-3 --long'       # zstd compression options for wsl:backup (higher levels: slower, barely smaller)
+
+# docker:backup / docker:restore tasks
+DOCKER_BACKUP_DIR     = 'D:\backup\docker'   # backups go to <dir>\<volume>\
+DOCKER_BACKUP_VOLUMES = '*'                  # comma-separated volume names, or '*' for all named volumes
+DOCKER_BACKUP_KEEP    = '2'                  # backups to keep per volume
