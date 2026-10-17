@@ -63,6 +63,17 @@ interpreter or script would let any process on the account run code elevated.
 Lists use the `winget export` format. mise itself is not listed: `install.ps1` installs it,
 and `winget upgrade` could downgrade a `mise self-update`d binary.
 
+### Backup and restore
+
+| Task      | Description |
+|-----------|-------------|
+| `backup`  | Runs `docker:backup`, then `wsl:backup` (`-SkipDocker` / `-SkipWsl` skip a part). |
+| `restore` | Restores the newest backups (`-Previous`: the previous ones) of all configured Docker volumes, then WSL distros. Asks for confirmation once (`-Force` skips it); each restore still verifies its archive first. |
+
+Docker goes first in both: the WSL tasks stop Docker, the Docker tasks need it running.
+A failed step doesn't stop the next one; the task reports the failures at the end.
+The dedicated tasks below do one part, with all their options.
+
 ### WSL tasks
 
 | Task          | Description |

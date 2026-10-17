@@ -7,7 +7,7 @@ junction to `~\.config\mise`, so editing files there edits the live config.
 
 - `install.ps1` - bootstrap: installs mise (winget), pins it, creates `*.local.*` from `*.example`, links, `mise install`
 - `mise/config.toml` - global tools and settings; `mise/config.local.toml` - machine-specific `[env]` (git-ignored)
-- `mise/tasks/` - file tasks (`update`, `update:silent`, `winget:install`, `wsl:backup`, `wsl:restore`, `docker:backup`, `docker:restore`)
+- `mise/tasks/` - file tasks (`update`, `update:silent`, `winget:install`, `backup`, `restore`, `wsl:backup`, `wsl:restore`, `docker:backup`, `docker:restore`)
 - `mise/lib/` - code shared by tasks (outside `tasks/` so mise doesn't list it); the docker tasks reuse `wsl-common.ps1`
 - `winget/*.json` - app lists in `winget export` format
 
