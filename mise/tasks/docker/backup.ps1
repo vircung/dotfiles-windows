@@ -40,14 +40,8 @@ if (-not $names) { Fail 'No volumes to back up.' }
 # Same layout as wsl:backup: <dir>\<volume>\<volume>-<stamp>.tar.zst, written as .partial and renamed on success.
 $stamp  = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $failed = @()
-# Stopped once for all volumes, so a container using several of them isn't backed up from different moments.
-$running = @($names | ForEach-Object { docker ps -q --filter "volume=$_" } | Sort-Object -Unique)
+$running = @(Stop-Containers $names)
 try {
-    if ($running) {
-        Write-Host "Stopping containers using them: $((docker inspect --format '{{.Name}}' $running) -replace '^/')"
-        docker stop $running | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "docker stop failed with exit code $LASTEXITCODE." }
-    }
     foreach ($name in $names) {
         Write-Host "`n[$name]"
         $dir     = Join-Path $BackupDir $name

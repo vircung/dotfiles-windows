@@ -56,13 +56,8 @@ if (-not $ok) { Fail 'The archive is corrupted - nothing was changed.' }
 Write-Host 'Archive OK.' -ForegroundColor Green
 
 # --- Replace the contents ---
-$running = @(docker ps -q --filter "volume=$Volume")
+$running = @(Stop-Containers $Volume)
 try {
-    if ($running) {
-        Write-Host "Stopping containers using it: $(docker ps --format '{{.Names}}' --filter "volume=$Volume")"
-        docker stop $running | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "docker stop failed with exit code $LASTEXITCODE." }
-    }
     if (-not $exists) {
         docker volume create $Volume | Out-Null
         if ($LASTEXITCODE -ne 0) { Fail "docker volume create failed with exit code $LASTEXITCODE." }

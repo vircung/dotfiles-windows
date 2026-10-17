@@ -49,6 +49,19 @@ function Stop-DockerAndWsl {
     $wasRunning
 }
 
+# Stops the running containers that use any of $Volumes, all at once so a container using several volumes
+# stays consistent. Returns their IDs for the caller's finally block; on failure starts them again itself.
+function Stop-Containers([string[]]$Volumes) {
+    $ids = @($Volumes | ForEach-Object { docker ps -q --filter "volume=$_" 2>$null } | Sort-Object -Unique)
+    if ($ids) {
+        Write-Host "Stopping containers: $((docker inspect --format '{{.Name}}' $ids) -replace '^/')"
+        docker stop $ids | Out-Null
+        $code = $LASTEXITCODE
+        if ($code -ne 0) { docker start $ids | Out-Null; Fail "docker stop failed with exit code $code." }
+    }
+    $ids
+}
+
 function Format-Size([long]$Bytes) {
     if ($Bytes -ge 1GB) { '{0:N1} GB' -f ($Bytes / 1GB) } elseif ($Bytes -ge 1MB) { '{0:N1} MB' -f ($Bytes / 1MB) } else { '{0:N1} KB' -f ($Bytes / 1KB) }
 }

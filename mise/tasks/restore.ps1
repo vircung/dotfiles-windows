@@ -51,13 +51,8 @@ $failed = @()
 # Each task runs in its own process: they end with `exit`, which would end this script too.
 # Containers are stopped once for all volumes (docker:restore then finds none running), so none
 # starts with only some of its volumes restored.
-$running = @($volumes | ForEach-Object { docker ps -q --filter "volume=$_" 2>$null } | Sort-Object -Unique)
+$running = @(Stop-Containers $volumes)
 try {
-    if ($running) {
-        Step 'Stopping containers that use the volumes'
-        docker stop $running | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "docker stop failed with exit code $LASTEXITCODE." }
-    }
     foreach ($v in $volumes) {
         Step "Docker volume: $v"
         pwsh -NoProfile -File "$PSScriptRoot\docker\restore.ps1" -Volume $v @extra
