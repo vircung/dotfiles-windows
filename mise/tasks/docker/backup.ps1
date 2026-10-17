@@ -38,7 +38,7 @@ if (-not $names) { Fail 'No volumes to back up.' }
 
 # --- Back up each volume ---
 # Same layout as wsl:backup: <dir>\<volume>\<volume>-<stamp>.tar.zst, written as .partial and renamed on success.
-$stamp  = Get-Date -Format 'yyyy-MM-dd_HHmm'
+$stamp  = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $failed = @()
 # Stopped once for all volumes, so a container using several of them isn't backed up from different moments.
 $running = @($names | ForEach-Object { docker ps -q --filter "volume=$_" } | Sort-Object -Unique)

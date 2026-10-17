@@ -31,7 +31,7 @@ if (-not $drive.IsReady) { Fail "Drive $($drive.Name) is not connected." }
 # --- Distros ---
 # Each distro has its own subdirectory, so rotating "Ubuntu" doesn't touch "Ubuntu-OpenRig" backups.
 # Write to a .partial file and rename only on success: a failed backup never displaces good ones.
-$stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
+$stamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $jobs = [Collections.Generic.List[object]]::new()
 foreach ($name in Split-List $Distro) {
     $info = Get-DistroInfo $name
