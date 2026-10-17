@@ -119,6 +119,8 @@ function Get-ZstdContentSize($Path) {
 
 # Bytes a (sparse) file actually occupies on disk.
 function Get-AllocatedSize($Path) {
+    # A missing file (stale registry entry) would come back as the API's error value, ~4 GB.
+    if (-not [IO.File]::Exists($Path)) { return 0 }
     if (-not ('Wsl.Native' -as [type])) {
         Add-Type -Namespace Wsl -Name Native -MemberDefinition '[DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern uint GetCompressedFileSizeW(string path, out uint high);'
     }
