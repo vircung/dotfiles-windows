@@ -75,21 +75,10 @@ try {
 $failed = @()
 foreach ($job in $jobs) {
     Write-Host "`n[$($job.Distro)]"
-    if ($job.Exit -ne 0 -or -not (Get-Item $job.Partial -ErrorAction SilentlyContinue).Length) {
-        Remove-Item $job.Partial -Force -ErrorAction SilentlyContinue
+    if (-not (Complete-Backup $job.Partial $job.Final $Keep ($job.Exit -eq 0))) {
         Write-Host "ERROR: Backup failed with exit code $($job.Exit). Previous backups were left untouched." -ForegroundColor Red
         $failed += $job.Distro
-        continue
     }
-    $backup = Rename-Item $job.Partial (Split-Path $job.Final -Leaf) -PassThru
-    Write-Host ('OK: {0:N1} GB' -f ($backup.Length / 1GB)) -ForegroundColor Green
-
-    $all = Get-Backups $job.Dir
-    $all | Select-Object -Skip $Keep | ForEach-Object {
-        Write-Host "Removing old backup: $($_.Name)"
-        Remove-Item $_.FullName -Force
-    }
-    $all | Select-Object -First $Keep | ForEach-Object { '  {0}  {1,6:N1} GB' -f $_.Name, ($_.Length / 1GB) }
 }
 
 if ($failed) { Fail "Backup failed for: $($failed -join ', ')." }

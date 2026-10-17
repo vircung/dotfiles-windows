@@ -68,6 +68,25 @@ function Get-Backups($Dir) {
     @(Get-ChildItem $Dir -File | Where-Object Name -match '\.(vhdx\.zst|tar\.zst|tar\.gz)$' | Sort-Object Name -Descending)
 }
 
+# Renames a finished .partial backup to $Final and keeps the newest $Keep backups in its directory.
+# A failed or empty backup is deleted instead, so it never displaces good ones. Returns whether it was kept.
+function Complete-Backup($Partial, $Final, [int]$Keep, [bool]$Ok) {
+    if (-not $Ok -or -not (Get-Item $Partial -ErrorAction SilentlyContinue).Length) {
+        Remove-Item $Partial -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    $backup = Rename-Item $Partial (Split-Path $Final -Leaf) -PassThru
+    Write-Host "OK: $(Format-Size $backup.Length)" -ForegroundColor Green
+
+    $all = Get-Backups (Split-Path $Final)
+    $all | Select-Object -Skip $Keep | ForEach-Object {
+        Write-Host "Removing old backup: $($_.Name)"
+        Remove-Item $_.FullName -Force
+    }
+    $all | Select-Object -First $Keep | ForEach-Object { Write-Host ('  {0}  {1,10}' -f $_.Name, (Format-Size $_.Length)) }
+    $true
+}
+
 # Decompressed size from the first zstd frame header, $null if not recorded.
 # (zstd -l can't be used: it fails on large files on Windows.)
 function Get-ZstdContentSize($Path) {

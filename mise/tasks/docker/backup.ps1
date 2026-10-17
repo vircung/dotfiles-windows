@@ -57,21 +57,10 @@ try {
         Get-ChildItem $dir -Filter '*.partial' | Remove-Item -Force
 
         $codes = Invoke-BytePipe ('docker.exe', 'run', '--rm', '-v', "${name}:/v:ro", 'debian:stable-slim', 'tar', '--numeric-owner', '-C', '/v', '-cf', '-', '.') ($zstd, '-T0', '-3', '--check', '-q', '-f', '-o', $partial)
-        if ($codes -ne 0 -or -not (Get-Item $partial -ErrorAction SilentlyContinue).Length) {
-            Remove-Item $partial -Force -ErrorAction SilentlyContinue
+        if (-not (Complete-Backup $partial $final $Keep (-not ($codes -ne 0)))) {
             Write-Host "ERROR: Backup failed (tar exit $($codes[0]), zstd exit $($codes[1])). Previous backups were left untouched." -ForegroundColor Red
             $failed += $name
-            continue
         }
-        $backup = Rename-Item $partial (Split-Path $final -Leaf) -PassThru
-        Write-Host "OK: $(Format-Size $backup.Length)" -ForegroundColor Green
-
-        $all = Get-Backups $dir
-        $all | Select-Object -Skip $Keep | ForEach-Object {
-            Write-Host "Removing old backup: $($_.Name)"
-            Remove-Item $_.FullName -Force
-        }
-        $all | Select-Object -First $Keep | ForEach-Object { '  {0}  {1,10}' -f $_.Name, (Format-Size $_.Length) }
     }
 } finally {
     if ($running) { docker start $running | Out-Null }
