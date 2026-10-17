@@ -7,8 +7,14 @@ $ErrorActionPreference = 'Stop'
 $dir = Join-Path $env:ProgramData 'dotfiles'
 New-Item -ItemType Directory -Force $dir | Out-Null
 # The task runs the script from here elevated, so only Administrators and SYSTEM may write; Users may read the log.
-icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE." }
+# Users can create directories in ProgramData: if one did, take ownership and drop its explicit entries first.
+foreach ($a in @('/setowner', '*S-1-5-32-544'), @('/reset'),
+               @('/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX')) {
+    icacls $dir @a | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls $($a[0]) failed with exit code $LASTEXITCODE." }
+}
+# Files from before the lock may be owned by a user; none of them needs to be kept.
+Get-ChildItem $dir -Force | Remove-Item -Recurse -Force
 Copy-Item (Join-Path $PSScriptRoot 'winget-upgrade-runner.ps1') (Join-Path $dir 'winget-upgrade.ps1') -Force
 
 $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
