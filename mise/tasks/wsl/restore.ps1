@@ -59,11 +59,12 @@ if (-not $InstallDir) {
     }
 }
 
-# A .vhdx backup is decompressed straight into place; unregistering the distro deletes its current disk.
-if ($format -eq 'vhdx.zst') {
-    $vhd = Join-Path $InstallDir 'ext4.vhdx'
-    if ((Test-Path $vhd) -and -not ($info -and $info.VhdPath -eq $vhd)) { Fail "$vhd already exists and doesn't belong to '$Distro' - remove it or pick another -InstallDir." }
+# Every format ends up as <InstallDir>\ext4.vhdx; unregistering the distro deletes only its own current disk.
+$vhd = Join-Path $InstallDir 'ext4.vhdx'
+if ((Test-Path $vhd) -and -not ($info -and $info.VhdPath -eq $vhd)) { Fail "$vhd already exists and doesn't belong to '$Distro' - remove it or pick another -InstallDir." }
 
+# A .vhdx backup is decompressed straight into place.
+if ($format -eq 'vhdx.zst') {
     # Decompressed size from the zstd frame header; free space counts the disk that unregister will delete.
     $size = Get-ZstdContentSize $archive.FullName
     if ($size) {
