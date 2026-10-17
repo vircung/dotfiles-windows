@@ -3,6 +3,8 @@
 
 $ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = '1'   # readable output from wsl.exe
+# Decode captured native output (wsl.exe, docker) as UTF-8, not the console's OEM code page (e.g. 852).
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 
 $DockerProcesses = 'Docker Desktop', 'com.docker.backend'
 
