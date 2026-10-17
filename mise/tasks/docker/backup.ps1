@@ -19,8 +19,10 @@ Assert-Config @{ DOCKER_BACKUP_VOLUMES = $Volume; DOCKER_BACKUP_DIR = $BackupDir
 $zstd = Get-Zstd
 
 # --- Target drive ---
-$drive = [IO.DriveInfo](Split-Path $BackupDir -Qualifier)
-if (-not $drive.IsReady) { Fail "Drive $($drive.Name) is not connected." }
+# DriveInfo doesn't take UNC paths; a \\server\share target is only checked for being reachable.
+$root  = [IO.Path]::GetPathRoot($BackupDir)
+$drive = $root -like '\\*' ? $null : [IO.DriveInfo]$root
+if ($drive ? -not $drive.IsReady : -not (Test-Path $root)) { Fail "Drive $root is not connected." }
 
 # --- Docker and volumes ---
 docker info --format '{{.ServerVersion}}' *> $null

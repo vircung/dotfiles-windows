@@ -25,8 +25,10 @@ $zstdArgs = @('-T0') + @(($Zstd ? $Zstd : '-3 --long') -split '\s+' | Where-Obje
 $ext      = $Live ? 'tar.zst' : 'vhdx.zst'
 
 # --- Target drive ---
-$drive = [IO.DriveInfo](Split-Path $BackupDir -Qualifier)
-if (-not $drive.IsReady) { Fail "Drive $($drive.Name) is not connected." }
+# DriveInfo doesn't take UNC paths; a \\server\share target is only checked for being reachable.
+$root  = [IO.Path]::GetPathRoot($BackupDir)
+$drive = $root -like '\\*' ? $null : [IO.DriveInfo]$root
+if ($drive ? -not $drive.IsReady : -not (Test-Path $root)) { Fail "Drive $root is not connected." }
 
 # --- Distros ---
 # Each distro has its own subdirectory, so rotating "Ubuntu" doesn't touch "Ubuntu-OpenRig" backups.
@@ -43,8 +45,11 @@ foreach ($name in Split-List $Distro) {
 
 # The .vhdx size is an upper bound on the compressed backup size - no need to start the distro.
 $needGB = [math]::Ceiling(($jobs | ForEach-Object { (Get-Item $_.Vhd).Length } | Measure-Object -Sum).Sum / 1GB) + 5
-$freeGB = [math]::Floor($drive.AvailableFreeSpace / 1GB)
-if ($freeGB -lt $needGB) { Fail "Not enough space on $($drive.Name): $freeGB GB free, ~$needGB GB needed." }
+# shortcut: no free-space check on a UNC target, add GetDiskFreeSpaceEx if backups to a share run out of space.
+if ($drive) {
+    $freeGB = [math]::Floor($drive.AvailableFreeSpace / 1GB)
+    if ($freeGB -lt $needGB) { Fail "Not enough space on $($drive.Name): $freeGB GB free, ~$needGB GB needed." }
+}
 
 foreach ($job in $jobs) {
     New-Item -ItemType Directory -Force $job.Dir | Out-Null
