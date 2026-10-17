@@ -98,7 +98,7 @@ on a disk image: `-6 --long` took 6.8 min for 19.8 GB, `-9 --long` 9.3 min for 1
 
 | Task             | Description |
 |------------------|-------------|
-| `docker:backup`  | Backs up the volumes in `DOCKER_BACKUP_VOLUMES` (`*` = all named volumes) to `DOCKER_BACKUP_DIR\<volume>\` as `.tar.zst`, keeping `DOCKER_BACKUP_KEEP` copies. Running containers that use a volume are stopped during its backup and started again. |
+| `docker:backup`  | Backs up the volumes in `DOCKER_BACKUP_VOLUMES` (`*` = all named volumes) to `DOCKER_BACKUP_DIR\<volume>\` as `.tar.zst`, keeping `DOCKER_BACKUP_KEEP` copies. Running containers that use the volumes are stopped once for the whole backup and started again. |
 | `docker:restore` | Verifies the newest backup of `-Volume <name>` (or `-Previous` / `-File <path>`), then replaces the volume's contents with it, creating the volume if needed. Asks for confirmation (`-Force` skips it). |
 
 Docker Desktop keeps images, containers and volumes on its own disk (`docker_data.vhdx`), which

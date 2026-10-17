@@ -61,6 +61,7 @@ try {
     if ($running) {
         Write-Host "Stopping containers using it: $(docker ps --format '{{.Names}}' --filter "volume=$Volume")"
         docker stop $running | Out-Null
+        if ($LASTEXITCODE -ne 0) { Fail "docker stop failed with exit code $LASTEXITCODE." }
     }
     if (-not $exists) {
         docker volume create $Volume | Out-Null
