@@ -2,6 +2,7 @@
 antigravity-cli = "latest"
 claude = "latest"
 codex = "latest"
+node = "lts"
 powershell = "latest"
 python = "latest"
 
