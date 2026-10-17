@@ -6,14 +6,21 @@ $log = "$PSScriptRoot\winget-upgrade.log"
 $exitFile = "$PSScriptRoot\winget-upgrade.exitcode"
 [IO.File]::Delete($exitFile)
 
-$psi = [Diagnostics.ProcessStartInfo]::new("$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe",
-    'upgrade --all --silent --disable-interactivity --accept-package-agreements --accept-source-agreements')
-$psi.UseShellExecute = $false
-$psi.RedirectStandardOutput = $true
-$psi.RedirectStandardError = $true
-
 $out = [IO.File]::Open($log, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
 try {
+    # Newest winget.exe from the admin-only package folder: the %LOCALAPPDATA%\Microsoft\WindowsApps alias is user-writable.
+    $winget = $null; $best = [version]'0.0'
+    foreach ($d in [IO.Directory]::GetDirectories([Environment]::GetFolderPath('ProgramFiles') + '\WindowsApps', 'Microsoft.DesktopAppInstaller_*__8wekyb3d8bbwe')) {
+        $v = [version]([IO.Path]::GetFileName($d).Split('_')[1])
+        if ($v -gt $best -and [IO.File]::Exists("$d\winget.exe")) { $best = $v; $winget = "$d\winget.exe" }
+    }
+    if (-not $winget) { throw 'winget.exe not found in Program Files\WindowsApps.' }
+
+    $psi = [Diagnostics.ProcessStartInfo]::new($winget,
+        'upgrade --all --silent --disable-interactivity --accept-package-agreements --accept-source-agreements')
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
     $p = [Diagnostics.Process]::Start($psi)
     $stderr = $p.StandardError.ReadToEndAsync()
     # Flush every chunk so `mise run update` can show the log live.
