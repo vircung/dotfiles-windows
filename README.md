@@ -77,6 +77,8 @@ Both tasks need `zstd` (`Meta.Zstandard` in `winget/dev.json`). zstd uses all co
 the disk image avoids packing every file through `wsl --export`: on a 48 GB distro the backup took
 4.4 min instead of 43 min with `wsl --export --format tar.gz`, and the file was smaller (20.4 vs 21.4 GB).
 Disk images are taken only with WSL stopped, as an image of a running distro could be inconsistent.
-A restored image has its free space allocated, so the restore runs `fstrim` to shrink the sparse `.vhdx`.
+A restored image has its free space allocated. The restore enables a sparse `.vhdx` and runs `fstrim` to
+release it, but WSL currently refuses sparse mode without `--allow-unsafe` (potential data corruption),
+so the restore only prints that command and the `.vhdx` keeps its full size (64 GB for the 48 GB distro).
 `WSL_BACKUP_ZSTD` (or `-Zstd`) sets the compression options, default `-3 --long`. Higher levels gain little
 on a disk image: `-6 --long` took 6.8 min for 19.8 GB, `-9 --long` 9.3 min for 19.5 GB.

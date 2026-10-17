@@ -138,11 +138,12 @@ try {
         Write-Host "Sparse VHD not enabled. To force it: wsl --manage $Distro --set-sparse true --allow-unsafe" -ForegroundColor Yellow
     }
 
-    # The decompressed disk image has its free space allocated too; trimming it shrinks the sparse .vhdx.
+    # The decompressed disk image has its free space allocated too; trimming it shrinks the .vhdx if it's sparse.
     wsl -d $Distro -u root -- fstrim /
     wsl -d $Distro -- bash -c 'echo "User: $(whoami)"; df -h /'
     if ($LASTEXITCODE -ne 0) { Fail 'The distro failed to start after the import.' }
-    wsl --set-default $Distro | Out-Null
+    # Unregistering moves the default to another distro; restore it only if this one was the default.
+    if ($info.IsDefault) { wsl --set-default $Distro | Out-Null }
 } finally {
     if ($dockerWasRunning) { Start-DockerDesktop }
 }

@@ -17,14 +17,20 @@ function Assert-Config([hashtable]$Settings) {
 # "Ubuntu, Ubuntu-OpenRig" -> 'Ubuntu', 'Ubuntu-OpenRig'. Wrap the result in @(), since PowerShell unwraps single-element arrays.
 function Split-List($value) { $value -split ',' | ForEach-Object Trim | Where-Object { $_ } }
 
-# Distro BasePath and .vhdx path from the registry (wsl.exe doesn't expose them); $null if it doesn't exist.
+# Distro BasePath, .vhdx path and whether it's the default, from the registry (wsl.exe doesn't expose them);
+# $null if it doesn't exist.
 function Get-DistroInfo($Distro) {
-    $p = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss |
+    $lxss = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
+    $p = Get-ChildItem $lxss |
         ForEach-Object { Get-ItemProperty $_.PSPath } |
         Where-Object DistributionName -eq $Distro
     if (-not $p) { return }
     $base = $p.BasePath -replace '^\\\\\?\\', ''
-    [pscustomobject]@{ BasePath = $base; VhdPath = Join-Path $base $p.VhdFileName }
+    [pscustomobject]@{
+        BasePath  = $base
+        VhdPath   = Join-Path $base $p.VhdFileName
+        IsDefault = (Get-ItemProperty $lxss).DefaultDistribution -eq $p.PSChildName
+    }
 }
 
 # Stops Docker Desktop (if running) and all of WSL. Returns $true if Docker was running.
