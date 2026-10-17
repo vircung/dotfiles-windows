@@ -75,7 +75,7 @@ if (-not $SkipWinget -and $Silent) {
             $state = (Get-ScheduledTask -TaskPath $taskPath -TaskName $taskName).State
             if ($state -ne 'Running' -and ((Get-Date) - $started).TotalSeconds -gt 15) { break }
         }
-        Show-Log $log ([ref]$pos) -Final
+        if ((Test-Path $log) -and (Get-Item $log).LastWriteTime -ge $started) { Show-Log $log ([ref]$pos) -Final }
 
         $code = ((Test-Path $exitFile) -and (Get-Item $exitFile).LastWriteTime -ge $started) ? [int](Get-Content $exitFile) : $null
         # 0x8A15002B: no applicable upgrade
