@@ -23,7 +23,7 @@ junction to `~\.config\mise`, so editing files there edits the live config.
 
 ## Verifying changes
 
-There are no tests. Parse scripts with `[System.Management.Automation.Language.Parser]::ParseFile`,
+The only test is `tests/zstd-content-size.ps1` (run it after changing `Get-ZstdContentSize`). Parse scripts with `[System.Management.Automation.Language.Parser]::ParseFile`,
 check `mise tasks ls`, and exercise early-failure paths (e.g. `mise run wsl:backup -- -BackupDir Q:\x`).
 Don't run tasks that change the system (updates, WSL backup/restore) without asking.
 
