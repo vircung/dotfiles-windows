@@ -28,19 +28,20 @@ function Test-WingetTask {
 }
 
 # Prints complete new log lines from $Position on, skipping winget's progress bars and spinners.
-function Show-Log([string]$Path, [ref]$Position, [ref]$Pending, [switch]$Final) {
+# Reads up to the last LF byte only, so a line or a UTF-8 character is never split between reads.
+function Show-Log([string]$Path, [ref]$Position, [switch]$Final) {
     if (-not (Test-Path $Path)) { return }
     $fs = [IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
     try {
         if ($fs.Length -lt $Position.Value) { $Position.Value = 0 }   # truncated by a new run
         $fs.Position = $Position.Value
-        $text = $Pending.Value + [IO.StreamReader]::new($fs).ReadToEnd()
-        $Position.Value = $fs.Length
+        $bytes = [byte[]]::new($fs.Length - $Position.Value)
+        $n = $fs.Read($bytes, 0, $bytes.Length)
     } finally { $fs.Dispose() }
-    $parts = $text -split "`r|`n"
-    $Pending.Value = $Final ? '' : $parts[-1]
-    $complete = $Final ? $parts : ($parts | Select-Object -SkipLast 1)
-    $complete | Where-Object { $_.Trim() -and $_ -notmatch '^\s*[-\\|/]\s*$' -and $_ -notmatch '[\u2588\u2592]' } |
+    if ($n -eq 0) { return }
+    $end = $Final ? $n : [Array]::LastIndexOf($bytes, [byte]10, $n - 1) + 1
+    $Position.Value += $end
+    [Text.Encoding]::UTF8.GetString($bytes, 0, $end) -split "`r|`n" | Where-Object { $_.Trim() -and $_ -notmatch '^\s*[-\\|/]\s*$' -and $_ -notmatch '[\u2588\u2592]' } |
         ForEach-Object { Write-Host $_.TrimEnd() }
 }
 
@@ -66,15 +67,15 @@ if (-not $SkipWinget -and $Silent) {
         $exitFile = Join-Path $taskDir 'winget-upgrade.exitcode'
         $started  = Get-Date
         Start-ScheduledTask -TaskPath $taskPath -TaskName $taskName
-        $pos = 0; $pending = ''
+        $pos = 0
         # Done when the runner writes its exit code; the task state alone races with a just-started task.
         while (-not ((Test-Path $exitFile) -and (Get-Item $exitFile).LastWriteTime -ge $started)) {
             Start-Sleep -Milliseconds 500
-            if ((Test-Path $log) -and (Get-Item $log).LastWriteTime -ge $started) { Show-Log $log ([ref]$pos) ([ref]$pending) }
+            if ((Test-Path $log) -and (Get-Item $log).LastWriteTime -ge $started) { Show-Log $log ([ref]$pos) }
             $state = (Get-ScheduledTask -TaskPath $taskPath -TaskName $taskName).State
             if ($state -ne 'Running' -and ((Get-Date) - $started).TotalSeconds -gt 15) { break }
         }
-        Show-Log $log ([ref]$pos) ([ref]$pending) -Final
+        Show-Log $log ([ref]$pos) -Final
 
         $code = ((Test-Path $exitFile) -and (Get-Item $exitFile).LastWriteTime -ge $started) ? [int](Get-Content $exitFile) : $null
         # 0x8A15002B: no applicable upgrade
